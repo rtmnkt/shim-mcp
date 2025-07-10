@@ -270,8 +270,10 @@ export class StdioTransportAdapter extends EventEmitter implements TransportAdap
 
   private async testHttpConnection(): Promise<void> {
     try {
+      // Test the health endpoint for connection
+      const healthUrl = `${this.config.backendUrl}/health`;
       const response = await Utils.withTimeout(
-        this.httpClient(this.config.backendUrl, {
+        this.httpClient(healthUrl, {
           method: 'GET',
           headers: { 'User-Agent': 'ShimMCP/1.0' }
         }),
@@ -310,11 +312,14 @@ export class StdioTransportAdapter extends EventEmitter implements TransportAdap
 
   private async sendViaHttp(envelope: SessionEnvelope): Promise<void> {
     try {
+      // Use the MCP endpoint for actual message sending
+      const mcpUrl = `${this.config.backendUrl}/mcp`;
       const response = await Utils.withTimeout(
-        this.httpClient(this.config.backendUrl, {
+        this.httpClient(mcpUrl, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'Accept': 'application/json, text/event-stream',
             'X-Session-Id': envelope.sessionId,
             'X-Sequence': envelope.sequence.toString()
           },

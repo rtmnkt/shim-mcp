@@ -1,0 +1,10 @@
+{
+  "type": "stdio",
+  "command": "sh",
+  "args": ["-c", "cd /home/remote314/ghq/github.com/rtmnkt/shim-mcp/samples/streamable-http-mcp && npm start"],
+  "env": {
+    "NODE_ENV": "production",
+    "PORT": "3000",
+    "HOST": "127.0.0.1"
+  }
+}

@@ -1,4 +1,5 @@
 import { EventEmitter } from 'events';
+import { createFileLogger } from 'vibelogger';
 import { 
   ShimMCPServer as IShimMCPServer,
   ShimMCPConfig,
@@ -23,6 +24,7 @@ export class ShimMCPServer extends EventEmitter implements IShimMCPServer {
   private backendAdapter?: BackendAdapter;
   private isStarted = false;
   private startTime?: number;
+  private logger = createFileLogger('shim-mcp');
 
   constructor() {
     super();
@@ -36,7 +38,18 @@ export class ShimMCPServer extends EventEmitter implements IShimMCPServer {
     this.config = this.validateAndNormalizeConfig(config);
     
     try {
-      console.log('[ShimMCP] Starting MCP proxy server...');
+      await this.logger.info(
+        'server_start_begin',
+        'Starting MCP proxy server with component initialization',
+        {
+          context: { 
+            backend: this.config.backend,
+            httpHost: this.config.httpHost,
+            httpPort: this.config.httpPort
+          },
+          humanNote: 'AI-TODO: Monitor startup sequence for potential bottlenecks'
+        }
+      );
       
       // Initialize components
       await this.initializeProcessManager();
@@ -56,11 +69,33 @@ export class ShimMCPServer extends EventEmitter implements IShimMCPServer {
       this.isStarted = true;
       this.startTime = Date.now();
       
-      console.log('[ShimMCP] Server started successfully');
+      await this.logger.info(
+        'server_start_complete',
+        'MCP proxy server started successfully',
+        {
+          context: { 
+            startTime: this.startTime,
+            uptime: 0,
+            components: ['processManager', 'sessionMultiplexer', 'transportAdapter']
+          },
+          humanNote: 'Server initialization complete, all components active'
+        }
+      );
       this.emit('started');
       
     } catch (error) {
-      console.error('[ShimMCP] Failed to start server:', error);
+      await this.logger.error(
+        'server_start_failed',
+        'Failed to start MCP proxy server',
+        {
+          context: { 
+            error: error instanceof Error ? error.message : 'Unknown error',
+            stack: error instanceof Error ? error.stack : undefined,
+            config: this.config
+          },
+          humanNote: 'AI-TODO: Analyze startup failure patterns for reliability improvements'
+        }
+      );
       await this.cleanup();
       throw new ShimMCPError(
         `Failed to start ShimMCP server: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -76,15 +111,47 @@ export class ShimMCPServer extends EventEmitter implements IShimMCPServer {
       return;
     }
 
-    console.log('[ShimMCP] Stopping MCP proxy server...');
+    await this.logger.info(
+      'server_stop_begin',
+      'Stopping MCP proxy server and cleaning up resources',
+      {
+        context: { 
+          uptime: this.getUptime(),
+          activeSessionCount: this.getActiveSessionCount(),
+          backendHealthy: await this.isBackendHealthy().catch(() => false)
+        },
+        humanNote: 'AI-TODO: Track shutdown duration and cleanup efficiency'
+      }
+    );
     
     try {
       this.isStarted = false;
       await this.cleanup();
-      console.log('[ShimMCP] Server stopped successfully');
+      await this.logger.info(
+        'server_stop_complete',
+        'MCP proxy server stopped successfully',
+        {
+          context: { 
+            finalUptime: this.getUptime(),
+            shutdownTime: Date.now()
+          },
+          humanNote: 'Server shutdown complete, all resources cleaned up'
+        }
+      );
       this.emit('stopped');
     } catch (error) {
-      console.error('[ShimMCP] Error during stop:', error);
+      await this.logger.error(
+        'server_stop_failed',
+        'Error during server shutdown',
+        {
+          context: { 
+            error: error instanceof Error ? error.message : 'Unknown error',
+            stack: error instanceof Error ? error.stack : undefined,
+            uptime: this.getUptime()
+          },
+          humanNote: 'AI-TODO: Investigate shutdown failure patterns'
+        }
+      );
       throw new ShimMCPError(
         `Failed to stop ShimMCP server: ${error instanceof Error ? error.message : 'Unknown error'}`,
         'STOP_FAILED',
@@ -105,7 +172,14 @@ export class ShimMCPServer extends EventEmitter implements IShimMCPServer {
         isHealthy: false
       },
       sessions: this.sessionMultiplexer?.getAllSessions() || [],
-      uptime: this.startTime ? Date.now() - this.startTime : 0
+      uptime: this.startTime ? Date.now() - this.startTime : 0,
+      // TDD Refactor: より実用的な実装に改善
+      logging: {
+        enabled: !!this.logger,
+        provider: 'vibelogger',
+        logDirectory: './logs/shim-mcp',
+        structured: true
+      }
     };
   }
 
@@ -146,18 +220,51 @@ export class ShimMCPServer extends EventEmitter implements IShimMCPServer {
     this.processManager = new MCPProcessManager();
     
     // Set up process manager event handlers
-    this.processManager.on(Constants.EVENTS.BACKEND_STARTED, (pid: number) => {
-      console.log(`[ShimMCP] Backend process started with PID: ${pid}`);
+    this.processManager.on(Constants.EVENTS.BACKEND_STARTED, async (pid: number) => {
+      await this.logger.info(
+        'backend_process_started',
+        'Backend process started successfully',
+        {
+          context: { 
+            pid: pid,
+            backendCommand: this.config.backend.command,
+            timestamp: Date.now()
+          },
+          humanNote: 'Backend process is now active and ready to handle requests'
+        }
+      );
       this.emit(Constants.EVENTS.BACKEND_STARTED, pid);
     });
     
-    this.processManager.on(Constants.EVENTS.BACKEND_STOPPED, () => {
-      console.log('[ShimMCP] Backend process stopped');
+    this.processManager.on(Constants.EVENTS.BACKEND_STOPPED, async () => {
+      await this.logger.info(
+        'backend_process_stopped',
+        'Backend process stopped',
+        {
+          context: { 
+            timestamp: Date.now(),
+            uptime: this.getUptime()
+          },
+          humanNote: 'Backend process has been gracefully stopped'
+        }
+      );
       this.emit(Constants.EVENTS.BACKEND_STOPPED);
     });
     
-    this.processManager.on(Constants.EVENTS.BACKEND_CRASHED, (error: Error) => {
-      console.error('[ShimMCP] Backend process crashed:', error);
+    this.processManager.on(Constants.EVENTS.BACKEND_CRASHED, async (error: Error) => {
+      await this.logger.error(
+        'backend_process_crashed',
+        'Backend process crashed unexpectedly',
+        {
+          context: { 
+            error: error.message,
+            stack: error.stack,
+            timestamp: Date.now(),
+            uptime: this.getUptime()
+          },
+          humanNote: 'AI-TODO: Analyze crash patterns and implement recovery strategies'
+        }
+      );
       this.emit(Constants.EVENTS.BACKEND_CRASHED, error);
     });
     
@@ -174,16 +281,38 @@ export class ShimMCPServer extends EventEmitter implements IShimMCPServer {
     });
     
     // Set up session multiplexer event handlers
-    this.sessionMultiplexer.on(Constants.EVENTS.SESSION_CREATED, (sessionId: string) => {
-      console.log(`[ShimMCP] Session created: ${sessionId}`);
+    this.sessionMultiplexer.on(Constants.EVENTS.SESSION_CREATED, async (sessionId: string) => {
+      await this.logger.info(
+        'session_created',
+        'New session created and registered with multiplexer',
+        {
+          context: { 
+            sessionId: sessionId,
+            activeSessionCount: this.getActiveSessionCount(),
+            timestamp: Date.now()
+          },
+          humanNote: 'Session multiplexer is handling new client connection'
+        }
+      );
       this.emit(Constants.EVENTS.SESSION_CREATED, sessionId);
       
       // Update process manager activity
       this.processManager?.updateActivity();
     });
     
-    this.sessionMultiplexer.on(Constants.EVENTS.SESSION_DESTROYED, (sessionId: string) => {
-      console.log(`[ShimMCP] Session destroyed: ${sessionId}`);
+    this.sessionMultiplexer.on(Constants.EVENTS.SESSION_DESTROYED, async (sessionId: string) => {
+      await this.logger.info(
+        'session_destroyed',
+        'Session destroyed and removed from multiplexer',
+        {
+          context: { 
+            sessionId: sessionId,
+            remainingSessionCount: this.getActiveSessionCount(),
+            timestamp: Date.now()
+          },
+          humanNote: 'Client session has been cleaned up and resources released'
+        }
+      );
       this.emit(Constants.EVENTS.SESSION_DESTROYED, sessionId);
     });
     
@@ -204,18 +333,49 @@ export class ShimMCPServer extends EventEmitter implements IShimMCPServer {
     });
     
     // Set up transport adapter event handlers
-    this.transportAdapter.on(Constants.EVENTS.TRANSPORT_CONNECTED, () => {
-      console.log('[ShimMCP] Transport connected');
+    this.transportAdapter.on(Constants.EVENTS.TRANSPORT_CONNECTED, async () => {
+      await this.logger.info(
+        'transport_connected',
+        'Transport layer connected and ready for communication',
+        {
+          context: { 
+            backendUrl: this.buildBackendUrl(),
+            timestamp: Date.now()
+          },
+          humanNote: 'Transport adapter is now ready to handle client connections'
+        }
+      );
       this.emit(Constants.EVENTS.TRANSPORT_CONNECTED);
     });
     
-    this.transportAdapter.on(Constants.EVENTS.TRANSPORT_DISCONNECTED, () => {
-      console.log('[ShimMCP] Transport disconnected');
+    this.transportAdapter.on(Constants.EVENTS.TRANSPORT_DISCONNECTED, async () => {
+      await this.logger.info(
+        'transport_disconnected',
+        'Transport layer disconnected',
+        {
+          context: { 
+            timestamp: Date.now(),
+            uptime: this.getUptime()
+          },
+          humanNote: 'Transport adapter has been disconnected, check network connectivity'
+        }
+      );
       this.emit(Constants.EVENTS.TRANSPORT_DISCONNECTED);
     });
     
-    this.transportAdapter.on('client.disconnected', (sessionId: string) => {
-      console.log(`[ShimMCP] Client disconnected: ${sessionId}`);
+    this.transportAdapter.on('client.disconnected', async (sessionId: string) => {
+      await this.logger.info(
+        'client_disconnected',
+        'Client disconnected from transport',
+        {
+          context: { 
+            sessionId: sessionId,
+            timestamp: Date.now(),
+            activeSessionCount: this.getActiveSessionCount()
+          },
+          humanNote: 'Client has disconnected, cleaning up associated session'
+        }
+      );
       this.sessionMultiplexer?.destroySession(sessionId);
     });
     
@@ -231,7 +391,17 @@ export class ShimMCPServer extends EventEmitter implements IShimMCPServer {
 
     // TODO: Implement backend adapter factory based on serverType
     // For now, we'll leave this as a placeholder
-    console.log('[ShimMCP] Backend adapter configuration:', this.config.backendAdapter);
+    await this.logger.info(
+      'backend_adapter_config',
+      'Backend adapter configuration detected',
+      {
+        context: { 
+          backendAdapter: this.config.backendAdapter,
+          timestamp: Date.now()
+        },
+        humanNote: 'AI-TODO: Implement backend adapter factory based on serverType'
+      }
+    );
   }
 
   private wireComponents(): void {
@@ -269,8 +439,18 @@ export class ShimMCPServer extends EventEmitter implements IShimMCPServer {
     // Stop transport adapter
     if (this.transportAdapter) {
       cleanupTasks.push(
-        this.transportAdapter.stop().catch(error => {
-          console.warn('[ShimMCP] Error stopping transport adapter:', error);
+        this.transportAdapter.stop().catch(async error => {
+          await this.logger.warning(
+            'transport_stop_error',
+            'Error stopping transport adapter during cleanup',
+            {
+              context: { 
+                error: error.message,
+                timestamp: Date.now()
+              },
+              humanNote: 'Transport adapter cleanup failed, may need manual intervention'
+            }
+          );
         })
       );
     }
@@ -278,8 +458,18 @@ export class ShimMCPServer extends EventEmitter implements IShimMCPServer {
     // Stop process manager
     if (this.processManager) {
       cleanupTasks.push(
-        this.processManager.stop().catch(error => {
-          console.warn('[ShimMCP] Error stopping process manager:', error);
+        this.processManager.stop().catch(async error => {
+          await this.logger.warning(
+            'process_manager_stop_error',
+            'Error stopping process manager during cleanup',
+            {
+              context: { 
+                error: error.message,
+                timestamp: Date.now()
+              },
+              humanNote: 'Process manager cleanup failed, backend process may still be running'
+            }
+          );
         })
       );
     }
@@ -289,7 +479,17 @@ export class ShimMCPServer extends EventEmitter implements IShimMCPServer {
       try {
         this.sessionMultiplexer.destroy();
       } catch (error) {
-        console.warn('[ShimMCP] Error destroying session multiplexer:', error);
+        await this.logger.warning(
+          'session_multiplexer_destroy_error',
+          'Error destroying session multiplexer during cleanup',
+          {
+            context: { 
+              error: error instanceof Error ? error.message : 'Unknown error',
+              timestamp: Date.now()
+            },
+            humanNote: 'Session multiplexer cleanup failed, sessions may not be properly cleaned up'
+          }
+        );
       }
     }
     
@@ -313,7 +513,17 @@ export class ShimMCPServer extends EventEmitter implements IShimMCPServer {
       throw new ShimMCPError('Process manager not initialized', 'NOT_INITIALIZED');
     }
     
-    console.log('[ShimMCP] Restarting backend process...');
+    await this.logger.info(
+      'backend_restart_begin',
+      'Restarting backend process',
+      {
+        context: { 
+          timestamp: Date.now(),
+          currentStatus: this.processManager.getStatus()
+        },
+        humanNote: 'Manual backend restart initiated'
+      }
+    );
     await this.processManager.restart();
   }
 

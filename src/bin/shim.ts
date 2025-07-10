@@ -157,34 +157,55 @@ class ShimMCPCLI {
       }
     }
 
-    // Override with command line options
+    // Start with config file as base
     const finalConfig: ShimMCPConfig = {
-      // Backend configuration
+      // Default settings
+      httpHost: '127.0.0.1',
+      httpPort: 3000,
+      maxConcurrentSessions: 50,
+      sessionIdleTimeout: 10 * 60 * 1000, // 10 minutes
+      logLevel: 'info',
       backend: {
-        command: this.parseBackendCommand(),
+        command: [],
         workingDirectory: process.cwd(),
-        healthCheckUrl: this.buildHealthCheckUrl(),
         restartPolicy: 'on-failure',
         maxRestartAttempts: 3
       },
       
-      // Transport settings
-      httpHost: this.options.backendHost || '127.0.0.1',
-      httpPort: this.options.backendPort || 3000,
-      
-      // Session settings
-      maxConcurrentSessions: this.options.maxSessions || 50,
-      sessionIdleTimeout: 10 * 60 * 1000, // 10 minutes
-      
-      // Backend adapter
-      backendAdapter: this.buildBackendAdapterConfig(),
-      
-      // Logging
-      logLevel: this.options.debug ? 'debug' : 'info',
-      
-      // Merge with config file
+      // Override with config file
       ...config
     };
+
+    // Override backend settings carefully
+    if (config.backend) {
+      finalConfig.backend = {
+        ...finalConfig.backend,
+        ...config.backend
+      };
+    }
+
+    // Override with command line options if provided
+    if (this.options.backend) {
+      finalConfig.backend.command = this.parseBackendCommand();
+    }
+    if (this.options.backendHost) {
+      finalConfig.httpHost = this.options.backendHost;
+    }
+    if (this.options.backendPort) {
+      finalConfig.httpPort = this.options.backendPort;
+    }
+    if (this.options.maxSessions) {
+      finalConfig.maxConcurrentSessions = this.options.maxSessions;
+    }
+    if (this.options.debug) {
+      finalConfig.logLevel = 'debug';
+    }
+    if (this.buildHealthCheckUrl()) {
+      finalConfig.backend.healthCheckUrl = this.buildHealthCheckUrl();
+    }
+    if (this.buildBackendAdapterConfig()) {
+      finalConfig.backendAdapter = this.buildBackendAdapterConfig();
+    }
 
     this.validateConfiguration(finalConfig);
     return finalConfig;

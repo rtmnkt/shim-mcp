@@ -1,0 +1,52 @@
+{
+  "description": "Configuration for connecting ShimMCP to streamable HTTP MCP server (TypeScript SDK)",
+  "backend": {
+    "command": ["npm", "start"],
+    "workingDirectory": "samples/streamable-http-mcp",
+    "environment": {
+      "PORT": "3000",
+      "HOST": "127.0.0.1",
+      "NODE_ENV": "production",
+      "DEBUG": "false"
+    },
+    "healthCheckUrl": "http://127.0.0.1:3000/health",
+    "healthCheckInterval": 30000,
+    "restartPolicy": "on-failure",
+    "maxRestartAttempts": 3,
+    "idleTimeout": 600000,
+    "startupTimeout": 10000,
+    "shutdownTimeout": 5000
+  },
+  "httpHost": "127.0.0.1",
+  "httpPort": 3000,
+  "stdioBufferSize": 65536,
+  "maxConcurrentSessions": 10,
+  "sessionIdleTimeout": 300000,
+  "backendAdapter": {
+    "serverType": "generic",
+    "transport": "http",
+    "endpoints": {
+      "main": "/mcp",
+      "health": "/health",
+      "status": "/status"
+    },
+    "requestFormat": "ndjson",
+    "responseFormat": "ndjson",
+    "streaming": true,
+    "customHeaders": {
+      "User-Agent": "ShimMCP/1.0.0",
+      "Accept": "application/x-ndjson",
+      "Content-Type": "application/x-ndjson"
+    },
+    "timeout": 30000,
+    "retryAttempts": 3,
+    "retryDelay": 1000
+  },
+  "logLevel": "info",
+  "monitoring": {
+    "enableMetrics": true,
+    "metricsPort": 9090,
+    "healthCheckEndpoint": "/health",
+    "readinessEndpoint": "/ready"
+  }
+}

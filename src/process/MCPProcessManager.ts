@@ -280,7 +280,7 @@ export class MCPProcessManager extends EventEmitter implements ProcessManager {
       clearTimeout(this.idleTimer);
     }
 
-    if (!this.config.idleTimeout) return;
+    if (!this.config || !this.config.idleTimeout) return;
 
     this.idleTimer = setTimeout(() => {
       const idleTime = Date.now() - this.lastActivity;
