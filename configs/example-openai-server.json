@@ -1,0 +1,34 @@
+{
+  "description": "Example configuration for OpenAI MCP server",
+  "backend": {
+    "command": ["node", "openai-mcp-server.js", "--port", "3000"],
+    "workingDirectory": "./backend",
+    "environment": {
+      "NODE_ENV": "production",
+      "OPENAI_API_KEY": "${OPENAI_API_KEY}",
+      "PORT": "3000"
+    },
+    "healthCheckUrl": "http://127.0.0.1:3000/health",
+    "restartPolicy": "on-failure",
+    "maxRestartAttempts": 5,
+    "healthCheckInterval": 10000,
+    "idleTimeout": 1800000
+  },
+  "httpHost": "127.0.0.1",
+  "httpPort": 3000,
+  "stdioBufferSize": 16384,
+  "maxConcurrentSessions": 10,
+  "sessionIdleTimeout": 900000,
+  "logLevel": "info",
+  "backendAdapter": {
+    "serverType": "openai",
+    "authToken": "${OPENAI_API_KEY}",
+    "version": "1.0",
+    "customHeaders": {
+      "X-Client-Type": "ShimMCP",
+      "OpenAI-Organization": "${OPENAI_ORG_ID}"
+    },
+    "codecPreference": "json",
+    "compressionPreference": "gzip"
+  }
+}

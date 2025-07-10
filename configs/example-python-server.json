@@ -1,0 +1,27 @@
+{
+  "description": "Example configuration for Python MCP server",
+  "backend": {
+    "command": ["python", "-m", "my_mcp_server", "--port", "3000"],
+    "workingDirectory": "./backend",
+    "environment": {
+      "PYTHONPATH": "./backend",
+      "MCP_LOG_LEVEL": "info"
+    },
+    "healthCheckUrl": "http://127.0.0.1:3000/health",
+    "restartPolicy": "on-failure",
+    "maxRestartAttempts": 3,
+    "healthCheckInterval": 5000,
+    "idleTimeout": 600000
+  },
+  "httpHost": "127.0.0.1",
+  "httpPort": 3000,
+  "stdioBufferSize": 8192,
+  "maxConcurrentSessions": 20,
+  "sessionIdleTimeout": 300000,
+  "logLevel": "info",
+  "backendAdapter": {
+    "serverType": "generic",
+    "codecPreference": "json",
+    "compressionPreference": "none"
+  }
+}

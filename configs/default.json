@@ -1,0 +1,21 @@
+{
+  "backend": {
+    "command": ["echo", "Please configure your backend command"],
+    "workingDirectory": "./",
+    "restartPolicy": "on-failure",
+    "maxRestartAttempts": 3,
+    "healthCheckInterval": 5000,
+    "idleTimeout": 600000
+  },
+  "httpHost": "127.0.0.1",
+  "httpPort": 3000,
+  "stdioBufferSize": 8192,
+  "maxConcurrentSessions": 50,
+  "sessionIdleTimeout": 600000,
+  "logLevel": "info",
+  "backendAdapter": {
+    "serverType": "generic",
+    "codecPreference": "json",
+    "compressionPreference": "none"
+  }
+}
